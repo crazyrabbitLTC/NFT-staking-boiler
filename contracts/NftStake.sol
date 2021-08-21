@@ -5,12 +5,13 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import "hardhat/console.sol";
 
 error GreeterError();
 
-contract NftStake is ReentrancyGuard {
+contract NftStake is IERC721Receiver, ReentrancyGuard {
     using SafeMath for uint256;
 
     IERC721 public nftToken;
@@ -74,6 +75,18 @@ contract NftStake is ReentrancyGuard {
         emit StakeRewardUpdated(tokensPerBlock);
     }
 
+    /**
+     * Always returns `IERC721Receiver.onERC721Received.selector`.
+     */
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
     //User must give this contract permission to take ownership of it.
     function stakeNFT(uint256 tokenId) public nonReentrant returns (bool) {
         // require this token is not already staked
@@ -96,6 +109,10 @@ contract NftStake is ReentrancyGuard {
         emit NftStaked(msg.sender, tokenId, block.number);
 
         return true;
+    }
+
+    function getCurrentStakeEarned(uint256 tokenId) public view returns (uint256) {
+        return _getTimeStaked(tokenId).mul(tokensPerBlock);
     }
 
     function unStakeNFT(uint256 tokenId)
@@ -145,7 +162,7 @@ contract NftStake is ReentrancyGuard {
         require(receipt[tokenId].stakedFromBlock > 0, "_payoutStake: Can not stake from block 0");
 
         // earned amount is difference between the stake start block, current block multiplied by stake amount
-        uint256 timeStaked = block.number.sub(receipt[tokenId].stakedFromBlock);
+        uint256 timeStaked = _getTimeStaked(tokenId).sub(1); // don't pay for the tx block of withdrawl
         uint256 payout = timeStaked.mul(tokensPerBlock);
 
         // If contract does not have enough tokens to pay out, return the NFT without payment
@@ -159,5 +176,13 @@ contract NftStake is ReentrancyGuard {
         erc20Token.transfer(receipt[tokenId].owner, payout);
 
         emit StakePayout(msg.sender, tokenId, payout, receipt[tokenId].stakedFromBlock, block.number);
+    }
+
+    function _getTimeStaked(uint256 tokenId) internal view returns (uint256) {
+        if (receipt[tokenId].stakedFromBlock == 0) {
+            return 0;
+        }
+
+        return block.number.sub(receipt[tokenId].stakedFromBlock);
     }
 }

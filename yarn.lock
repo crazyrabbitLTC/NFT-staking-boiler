@@ -1146,6 +1146,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openzeppelin/contracts@npm:^4.2.0":
+  version: 4.2.0
+  resolution: "@openzeppelin/contracts@npm:4.2.0"
+  checksum: f20a8113a685891c8e429252d2b9d5f02018cfc0f7251e3ae35bd17af9e3c47cb2e88e35a0e9b5c327c401801857fd0c19a36421ee77be4e41f0eb50f5a07590
+  languageName: node
+  linkType: hard
+
 "@paulrberg/solidity-template@workspace:.":
   version: 0.0.0-use.local
   resolution: "@paulrberg/solidity-template@workspace:."
@@ -1160,6 +1167,7 @@ __metadata:
     "@ethersproject/providers": ^5.4.3
     "@nomiclabs/hardhat-ethers": ^2.0.2
     "@nomiclabs/hardhat-waffle": ^2.0.1
+    "@openzeppelin/contracts": ^4.2.0
     "@typechain/ethers-v5": ^7.0.1
     "@typechain/hardhat": ^2.3.0
     "@types/chai": ^4.2.21
