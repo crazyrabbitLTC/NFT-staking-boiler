@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 import "hardhat/console.sol";
 
-error GreeterError();
-
 contract NftStake is IERC721Receiver, ReentrancyGuard {
     using SafeMath for uint256;
 
@@ -42,7 +40,7 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
         require(receipt[tokenId].stakedFromBlock != 0, "onlyStaker: Token is not staked");
 
         // require that msg.sender is the owner of this nft
-        require(receipt[tokenId].owner == msg.sender, "onlyStaker: Caller is not NFT owner");
+        require(receipt[tokenId].owner == msg.sender, "onlyStaker: Caller is not NFT stake owner");
 
         _;
     }
@@ -109,6 +107,10 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
         emit NftStaked(msg.sender, tokenId, block.number);
 
         return true;
+    }
+
+    function getStakeContractBalance() public view returns (uint256) {
+        return erc20Token.balanceOf(address(this));
     }
 
     function getCurrentStakeEarned(uint256 tokenId) public view returns (uint256) {

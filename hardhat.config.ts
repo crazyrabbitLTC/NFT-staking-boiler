@@ -55,6 +55,7 @@ const config: HardhatUserConfig = {
     currency: "USD",
     enabled: process.env.REPORT_GAS ? true : false,
     excludeContracts: [],
+    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
     src: "./contracts",
   },
   networks: {
@@ -63,6 +64,7 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
       chainId: chainIds.hardhat,
+      gasPrice: 875000000,
       // See https://github.com/sc-forks/solidity-coverage/issues/652
       hardfork: process.env.CODE_COVERAGE ? "berlin" : "london",
     },

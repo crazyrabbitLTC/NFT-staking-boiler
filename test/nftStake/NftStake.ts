@@ -24,7 +24,7 @@ describe("Unit tests", function () {
     this.signers.dao = signers[3];
   });
 
-  describe("Greeter", function () {
+  describe("NFTStake", function () {
     beforeEach(async function () {
       this.tokensPerBlock = 2;
 

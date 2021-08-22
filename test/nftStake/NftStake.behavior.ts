@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { EPERM } from "constants";
 import { BigNumber } from "ethers";
 import { network } from "hardhat";
 
@@ -75,5 +76,103 @@ export function shouldBehaveLikeNftStake(): void {
     ).to.eql(estimatedPayout);
   });
 
-  xit("_getTimeStaked should return zero when not staked");
+  it("getCurrentStakeEarned should return zero when not staked", async function () {
+    const tokenId = BigNumber.from(9999);
+    expect((await this.nftStake.connect(this.signers.user1).getCurrentStakeEarned(tokenId)).toNumber()).to.eql(0);
+  });
+
+  it("getCurrentStake should return correct stake amount currently", async function () {
+    const tokenId = BigNumber.from(1);
+
+    // Approve nftStake to take the token
+    await this.mockERC721.connect(this.signers.user1).approve(this.nftStake.address, tokenId);
+    // Try to stake it
+    await expect(this.nftStake.connect(this.signers.user1).stakeNFT(tokenId)).to.not.be.reverted;
+
+    // Wait 4 blocks
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+
+    expect((await this.nftStake.connect(this.signers.user1).getCurrentStakeEarned(tokenId)).toNumber()).to.eq(
+      4 * this.tokensPerBlock,
+    );
+  });
+
+  it("should allow harvesting without withdrawl", async function () {
+    const tokenId = BigNumber.from(1);
+    // Approve nftStake to take the token
+    await this.mockERC721.connect(this.signers.user1).approve(this.nftStake.address, tokenId);
+    // Try to stake it
+    await expect(this.nftStake.connect(this.signers.user1).stakeNFT(tokenId)).to.not.be.reverted;
+
+    // Wait 4 blocks
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+    await network.provider.send("evm_mine");
+
+    // get current earned stake
+    const currentEarnedStake = (
+      await this.nftStake.connect(this.signers.user1).getCurrentStakeEarned(tokenId)
+    ).toNumber();
+
+    // get current token balance of user
+    const balanceBeforeHarvest = (
+      await this.mockERC20.connect(this.signers.user1).balanceOf(await this.signers.user1.getAddress())
+    ).toNumber();
+
+    // get the staked receipt
+    const stakedAtOriginal = (
+      await this.nftStake.connect(this.signers.user1).receipt(tokenId)
+    ).stakedFromBlock.toNumber();
+
+    // get current blockNumer
+    let currentBlock = parseInt(await network.provider.send("eth_blockNumber"), 16);
+
+    // check the staked receipt is 4 blocks ago
+    expect(currentBlock - stakedAtOriginal).to.eq(4);
+
+    // should have no tokens
+    expect(balanceBeforeHarvest).to.eq(0);
+
+    // should not let you harvest tokens you did not stake
+    await expect(this.nftStake.connect(this.signers.user2).harvest(tokenId)).to.be.revertedWith(
+      "onlyStaker: Caller is not NFT stake owner",
+    );
+
+    // harvest Stake
+    await this.nftStake.connect(this.signers.user1).harvest(tokenId);
+
+    // should have harvested the tokens
+    expect(
+      (await this.mockERC20.connect(this.signers.user1).balanceOf(await this.signers.user1.getAddress())).toNumber(),
+    ).to.eq(currentEarnedStake);
+
+    // check the new receipt
+    const updatedStakeDate = (
+      await this.nftStake.connect(this.signers.user1).receipt(tokenId)
+    ).stakedFromBlock.toNumber();
+    currentBlock = parseInt(await network.provider.send("eth_blockNumber"), 16);
+
+    // check the staked receipt has been updated to current blocktime
+    expect(currentBlock).to.eq(updatedStakeDate);
+
+    // check that there is no pending payout availible
+    expect((await this.nftStake.connect(this.signers.user1).getCurrentStakeEarned(tokenId)).toNumber()).to.eq(0);
+
+    // check that nftStake still owns the token
+    expect(await this.mockERC721.connect(this.signers.user1).ownerOf(tokenId)).to.eq(this.nftStake.address);
+
+    // wait one block
+    await network.provider.send("evm_mine");
+
+    // check that there is now a pending payout availible again
+    expect((await this.nftStake.connect(this.signers.user1).getCurrentStakeEarned(tokenId)).toNumber()).to.eq(
+      1 * this.tokensPerBlock,
+    );
+  });
+
+  xit("can not do reentrancy");
 }
