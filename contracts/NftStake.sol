@@ -86,25 +86,11 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
     }
 
     //User must give this contract permission to take ownership of it.
-    function stakeNFT(uint256 tokenId) public nonReentrant returns (bool) {
-        // require this token is not already staked
-        require(receipt[tokenId].stakedFromBlock == 0, "Stake: Token is already staked");
-
-        // require this token is not already owned by this contract
-        require(nftToken.ownerOf(tokenId) != address(this), "Stake: Token is already staked in this contract");
-
-        // take possession of the NFT
-        nftToken.safeTransferFrom(msg.sender, address(this), tokenId);
-
-        // check that this contract is the owner
-        require(nftToken.ownerOf(tokenId) == address(this), "Stake: Failed to take possession of NFT");
-
-        // start the staking from this block.
-        receipt[tokenId].tokenId = tokenId;
-        receipt[tokenId].stakedFromBlock = block.number;
-        receipt[tokenId].owner = msg.sender;
-
-        emit NftStaked(msg.sender, tokenId, block.number);
+    function stakeNFT(uint256[] calldata tokenId) public nonReentrant returns (bool) {
+        // allow for staking multiple NFTS at one time.
+        for (uint256 i = 0; i < tokenId.length; i++) {
+            _stakeNFT(tokenId[i]);
+        }
 
         return true;
     }
@@ -117,13 +103,11 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
         return _getTimeStaked(tokenId).mul(tokensPerBlock);
     }
 
-    function unStakeNFT(uint256 tokenId)
-        public
-        nonReentrant
-        onlyStaker(tokenId)
-        requireTimeElapsed(tokenId)
-        returns (bool)
-    {
+    function unStakeNFT(uint256 tokenId) public nonReentrant returns (bool) {
+        return _unStakeNFT(tokenId);
+    }
+
+    function _unStakeNFT(uint256 tokenId) internal onlyStaker(tokenId) requireTimeElapsed(tokenId) returns (bool) {
         // payout stake, this should be safe as the function is non-reentrant
         _payoutStake(tokenId);
 
@@ -146,8 +130,13 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
         receipt[tokenId].stakedFromBlock = block.number;
     }
 
-    function reclaimTokens() external {
-        require(msg.sender == daoAdmin, "reclaimTokens: Caller is not the DAO");
+    function changeTokensPerblock(uint256 _tokensPerBlock) public onlyDao {
+        tokensPerBlock = _tokensPerBlock;
+
+        emit StakeRewardUpdated(tokensPerBlock);
+    }
+
+    function reclaimTokens() external onlyDao {
         erc20Token.transfer(daoAdmin, erc20Token.balanceOf(address(this)));
     }
 
@@ -155,6 +144,29 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
         tokensPerBlock = _tokensPerBlock;
 
         emit StakeRewardUpdated(tokensPerBlock);
+    }
+
+    function _stakeNFT(uint256 tokenId) internal returns (bool) {
+        // require this token is not already staked
+        require(receipt[tokenId].stakedFromBlock == 0, "Stake: Token is already staked");
+
+        // require this token is not already owned by this contract
+        require(nftToken.ownerOf(tokenId) != address(this), "Stake: Token is already staked in this contract");
+
+        // take possession of the NFT
+        nftToken.safeTransferFrom(msg.sender, address(this), tokenId);
+
+        // check that this contract is the owner
+        require(nftToken.ownerOf(tokenId) == address(this), "Stake: Failed to take possession of NFT");
+
+        // start the staking from this block.
+        receipt[tokenId].tokenId = tokenId;
+        receipt[tokenId].stakedFromBlock = block.number;
+        receipt[tokenId].owner = msg.sender;
+
+        emit NftStaked(msg.sender, tokenId, block.number);
+
+        return true;
     }
 
     function _payoutStake(uint256 tokenId) internal {
@@ -187,4 +199,6 @@ contract NftStake is IERC721Receiver, ReentrancyGuard {
 
         return block.number.sub(receipt[tokenId].stakedFromBlock);
     }
+
+    /** Add Function to allow the DAO to forcibly unstake an NFT and return it to the owner */
 }
